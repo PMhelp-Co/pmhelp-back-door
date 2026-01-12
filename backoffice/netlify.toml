@@ -3,6 +3,8 @@
 
 [build]
   # No build step needed - we're using vanilla HTML/CSS/JS
+  # If your repo root IS the backoffice folder, leave base directory empty
+  # If your repo contains the backoffice folder, set: base = "backoffice"
   publish = "."
   command = "echo 'No build needed - static files only'"
 
