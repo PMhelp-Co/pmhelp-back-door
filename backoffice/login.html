@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMHelp Back-Office - Login</title>
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/backoffice.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>PMHelp Back-Office</h1>
+                <p class="login-subtitle">Admin Access Only</p>
+            </div>
+
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required 
+                        autocomplete="email"
+                        placeholder="admin@pmhelp.co"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required 
+                        autocomplete="current-password"
+                        placeholder="Enter your password"
+                    />
+                </div>
+
+                <div id="login-error" class="error-message" style="display: none;"></div>
+
+                <button type="submit" class="btn-primary btn-block" id="login-submit-btn">
+                    Login
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p class="help-text">
+                    Access is restricted to authorized team members only.
+                    <br />
+                    If you need access, contact your administrator.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+    
+    <!-- Backoffice Scripts -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+
+    <!-- Login Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check if already logged in
+            const auth = new BackofficeAuth();
+            const { data: { session } } = await window.supabase.auth.getSession();
+            
+            if (session) {
+                // Check if user has admin access
+                const hasAccess = await auth.checkAdminAccess(session);
+                if (hasAccess) {
+                    window.location.href = 'index.html';
+                    return;
+                } else {
+                    // Log out if not admin
+                    await window.supabase.auth.signOut();
+                }
+            }
+
+            // Handle login form
+            const loginForm = document.getElementById('login-form');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const errorDiv = document.getElementById('login-error');
+            const submitBtn = document.getElementById('login-submit-btn');
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const email = emailInput.value.trim();
+                const password = passwordInput.value;
+
+                // Reset error
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Logging in...';
+
+                try {
+                    // Sign in with Supabase
+                    const { data, error } = await window.supabase.auth.signInWithPassword({
+                        email: email,
+                        password: password
+                    });
+
+                    if (error) {
+                        throw error;
+                    }
+
+                    // Check if user has admin/team/instructor role
+                    const { data: profile, error: profileError } = await window.supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', data.user.id)
+                        .single();
+
+                    if (profileError || !profile) {
+                        throw new Error('User profile not found');
+                    }
+
+                    const allowedRoles = ['admin', 'team', 'instructor'];
+                    if (!allowedRoles.includes(profile.role)) {
+                        await window.supabase.auth.signOut();
+                        throw new Error('Access denied. Admin, team, or instructor role required.');
+                    }
+
+                    // Success - redirect to dashboard
+                    window.location.href = 'index.html';
+
+                } catch (error) {
+                    console.error('Login error:', error);
+                    errorDiv.textContent = error.message || 'Login failed. Please check your credentials.';
+                    errorDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Login';
+                }
+            });
+
+            // Focus email input on load
+            emailInput.focus();
+        });
+    </script>
+</body>
+</html>
