@@ -233,6 +233,7 @@ h3 {
   box-shadow: var(--shadow-soft);
   transition: all var(--transition-base);
   cursor: default;
+  position: relative;
 }
 
 .stat-card:hover {
@@ -248,6 +249,47 @@ h3 {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tooltip-icon {
+  cursor: help;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+  transition: opacity var(--transition-base);
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+}
+
+.tooltip-icon:hover {
+  opacity: 1;
+}
+
+.stat-tooltip {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.stat-tooltip .tooltip-description {
+  margin-bottom: 0.25rem;
+}
+
+.stat-tooltip .tooltip-change {
+  font-weight: 600;
+}
+
+.stat-tooltip .tooltip-change.positive {
+  color: var(--success-color);
+}
+
+.stat-tooltip .tooltip-change.negative {
+  color: var(--danger-color);
 }
 
 .stat-value {
@@ -326,6 +368,83 @@ h3 {
   align-items: flex-end;
   justify-content: space-around;
   gap: 4px;
+  position: relative;
+}
+
+.chart-bar-wrapper {
+  position: relative;
+}
+
+.chart-bar {
+  position: relative;
+  cursor: pointer;
+}
+
+.chart-bar-number {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+}
+
+.chart-bar-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--gray-900);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 4px;
+}
+
+.chart-bar-wrapper:hover .chart-bar-tooltip {
+  opacity: 1;
+}
+
+.chart-bar-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--gray-900);
+}
+
+.chart-bar-tooltip .tooltip-value {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.chart-bar-tooltip .tooltip-change {
+  font-size: 0.6875rem;
+  opacity: 0.9;
+}
+
+.chart-bar-tooltip .tooltip-change.positive {
+  color: var(--success-color);
+}
+
+.chart-bar-tooltip .tooltip-change.negative {
+  color: var(--danger-color);
 }
 
 /* Completion Rates Table */

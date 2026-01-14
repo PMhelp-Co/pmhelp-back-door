@@ -14,44 +14,25 @@ class UsersAPI {
      */
     async searchUsersByEmail(searchTerm, limit = 50) {
         try {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:15',message:'searchUsersByEmail entry',data:{searchTerm,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             if (!searchTerm || searchTerm.trim().length < 2) {
                 return [];
             }
             
             const cleanTerm = searchTerm.trim();
-            const searchPattern = `%${cleanTerm}%`;
             
-            // Use separate queries and combine (more reliable than .or() with ilike)
-            // Search by name only (email is in auth.users, not profiles)
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:26',message:'Starting name search',data:{searchPattern},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
-            const { data: nameData, error: nameError } = await this.supabase
-                .from('profiles')
-                .select('id, full_name, created_at, role, updated_at')
-                .ilike('full_name', searchPattern)
-                .limit(limit)
-                .order('created_at', { ascending: false });
+            // Use database function to search both name and email
+            const { data: results, error: rpcError } = await this.supabase
+                .rpc('search_users_by_email_or_name', {
+                    search_term: cleanTerm,
+                    result_limit: limit
+                });
             
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:33',message:'Name search result',data:{hasData:!!nameData,dataCount:nameData?.length||0,hasError:!!nameError,errorCode:nameError?.code,errorMessage:nameError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
-            
-            if (nameError) {
-                console.error('Error searching users by name:', nameError);
+            if (rpcError) {
+                console.error('Error searching users:', rpcError);
+                return [];
             }
             
-            // Return name results (email search removed since email is not in profiles table)
-            const results = (nameData || [])
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                .slice(0, limit);
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:42',message:'searchUsersByEmail result',data:{resultCount:results.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
-            return results;
+            return results || [];
         } catch (error) {
             console.error('Error in searchUsersByEmail:', error);
             return [];
@@ -65,24 +46,34 @@ class UsersAPI {
      */
     async getUserDetails(userId) {
         try {
-            // Get user profile
-            const { data: user, error: userError } = await this.supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
+            // Get user profile with email from auth.users using RPC function
+            const { data: userData, error: userError } = await this.supabase
+                .rpc('get_user_details_with_email', { user_id: userId });
             
-            if (userError || !user) {
+            if (userError || !userData || userData.length === 0) {
                 console.error('Error fetching user:', userError);
-                return null;
+                // Fallback: Get user profile without email
+                const { data: user, error: fallbackError } = await this.supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                
+                if (fallbackError || !user) {
+                    return null;
+                }
+                return { ...user, email: null };
             }
             
-            // Get enrolled courses with progress
+            const user = userData[0];
+            
+            // Get enrolled courses with progress - need completed_at to calculate progress correctly
             const { data: progress, error: progressError } = await this.supabase
                 .from('user_progress')
                 .select(`
                     course_id,
-                    progress_percentage,
+                    lesson_id,
+                    completed_at,
                     updated_at,
                     courses:course_id (
                         id,
@@ -97,17 +88,103 @@ class UsersAPI {
                 console.error('Error fetching user progress:', progressError);
             }
             
-            // Calculate overall progress
-            const overallProgress = this.calculateOverallProgress(progress || []);
+            const progressData = progress || [];
+            
+            // Group progress by course_id and calculate progress based on completed_at
+            const courseProgressMap = new Map();
+            const courseIds = new Set();
+            
+            for (const progressRecord of progressData) {
+                const courseId = progressRecord.course_id;
+                courseIds.add(courseId);
+                
+                if (!courseProgressMap.has(courseId)) {
+                    courseProgressMap.set(courseId, {
+                        course_id: courseId,
+                        courses: progressRecord.courses,
+                        lessonMap: new Map(), // Map<lesson_id, {completed_at, updated_at}>
+                        lastUpdated: progressRecord.updated_at
+                    });
+                }
+                
+                const courseData = courseProgressMap.get(courseId);
+                
+                // Store the most recent progress record for each lesson
+                const lessonId = progressRecord.lesson_id;
+                if (!courseData.lessonMap.has(lessonId) || 
+                    new Date(progressRecord.updated_at) > new Date(courseData.lessonMap.get(lessonId).updated_at)) {
+                    courseData.lessonMap.set(lessonId, {
+                        completed_at: progressRecord.completed_at,
+                        updated_at: progressRecord.updated_at
+                    });
+                }
+                
+                // Update last updated timestamp
+                if (new Date(progressRecord.updated_at) > new Date(courseData.lastUpdated)) {
+                    courseData.lastUpdated = progressRecord.updated_at;
+                }
+            }
+            
+            // Get total lessons per course from lessons table
+            const totalLessonsPerCourse = new Map();
+            if (courseIds.size > 0) {
+                const { data: lessonsData, error: lessonsError } = await this.supabase
+                    .from('lessons')
+                    .select('id, course_id')
+                    .in('course_id', Array.from(courseIds));
+                
+                if (!lessonsError && lessonsData) {
+                    for (const lesson of lessonsData) {
+                        const courseId = lesson.course_id;
+                        totalLessonsPerCourse.set(courseId, (totalLessonsPerCourse.get(courseId) || 0) + 1);
+                    }
+                }
+            }
+            
+            // Convert map to array and calculate progress percentage
+            const uniqueCourses = Array.from(courseProgressMap.values()).map(courseData => {
+                // Count unique lessons with completed_at IS NOT NULL
+                const completedLessons = Array.from(courseData.lessonMap.values())
+                    .filter(lesson => lesson.completed_at !== null).length;
+                
+                // Get total lessons in course from lessons table
+                const totalLessons = totalLessonsPerCourse.get(courseData.course_id) || 0;
+                
+                // Calculate progress: (completed lessons / total lessons in course) * 100
+                const progressPercentage = totalLessons > 0
+                    ? Math.round((completedLessons / totalLessons) * 100)
+                    : 0;
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:137',message:'Calculating course progress',data:{courseId:courseData.course_id,completedLessons,totalLessons,progressPercentage},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
+                
+                return {
+                    course_id: courseData.course_id,
+                    courses: courseData.courses,
+                    progress_percentage: progressPercentage,
+                    updated_at: courseData.lastUpdated
+                };
+            });
+            
+            // Sort by most recent update
+            uniqueCourses.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'users-api.js:128',message:'Course progress calculated',data:{totalCourses:uniqueCourses.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            
+            // Calculate overall progress using deduplicated courses
+            const overallProgress = this.calculateOverallProgress(uniqueCourses);
             
             // Get last activity date (most recent progress update)
-            const lastActivity = progress && progress.length > 0
-                ? progress[0].updated_at
+            const lastActivity = uniqueCourses.length > 0
+                ? uniqueCourses[0].updated_at
                 : null;
             
             return {
                 ...user,
-                enrolledCourses: progress || [],
+                enrolledCourses: uniqueCourses,
                 overallProgress,
                 lastActivity
             };

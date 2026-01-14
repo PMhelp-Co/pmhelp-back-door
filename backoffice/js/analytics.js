@@ -2,6 +2,9 @@
 // Handles UI interactions and data display for analytics tab
 
 let analyticsAPI;
+let currentPeriod = 'weekly';
+let previousStats = {}; // Store previous week's stats for week-on-week comparison
+let currentDateFilter = { startDate: null, endDate: null }; // Store current date filter state
 
 // Initialize analytics when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,10 +30,42 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             periodButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const period = btn.dataset.period;
-            loadUsersChart(period);
+            currentPeriod = btn.dataset.period;
+            // Reload chart with current period and date filter
+            loadUsersChart(currentPeriod, currentDateFilter.startDate, currentDateFilter.endDate);
         });
     });
+    
+    // Date filter handlers
+    const applyDateFilterBtn = document.getElementById('apply-date-filter');
+    const clearDateFilterBtn = document.getElementById('clear-date-filter');
+    
+    if (applyDateFilterBtn) {
+        applyDateFilterBtn.addEventListener('click', () => {
+            const startDateInput = document.getElementById('chart-start-date');
+            const endDateInput = document.getElementById('chart-end-date');
+            const startDate = startDateInput?.value?.trim() || null;
+            const endDate = endDateInput?.value?.trim() || null;
+            
+            currentDateFilter.startDate = startDate;
+            currentDateFilter.endDate = endDate;
+            
+            console.log('Applying date filter:', { startDate, endDate, period: currentPeriod });
+            loadUsersChart(currentPeriod, startDate, endDate);
+        });
+    }
+    
+    if (clearDateFilterBtn) {
+        clearDateFilterBtn.addEventListener('click', () => {
+            const startDateInput = document.getElementById('chart-start-date');
+            const endDateInput = document.getElementById('chart-end-date');
+            if (startDateInput) startDateInput.value = '';
+            if (endDateInput) endDateInput.value = '';
+            currentDateFilter.startDate = null;
+            currentDateFilter.endDate = null;
+            loadUsersChart(currentPeriod);
+        });
+    }
 });
 
 /**
@@ -63,11 +98,17 @@ async function loadOverallStats() {
     try {
         const stats = await analyticsAPI.getOverallStats();
         
-        // Update stat cards
-        updateStatCard('total-users', stats.totalUsers);
-        updateStatCard('active-users', stats.activeUsers);
-        updateStatCard('total-courses', stats.totalCourses);
-        updateStatCard('total-completions', stats.totalCompletions);
+        // Store previous stats for week-on-week comparison (using localStorage)
+        const storedStats = JSON.parse(localStorage.getItem('previousStats') || '{}');
+        
+        // Update stat cards with values and tooltips
+        updateStatCard('total-users', stats.totalUsers, storedStats.totalUsers);
+        updateStatCard('active-users', stats.activeUsers, storedStats.activeUsers);
+        updateStatCard('total-courses', stats.totalCourses, storedStats.totalCourses);
+        updateStatCard('total-completions', stats.totalCompletions, storedStats.totalCompletions);
+        
+        // Store current stats for next comparison
+        localStorage.setItem('previousStats', JSON.stringify(stats));
     } catch (error) {
         console.error('Error loading overall stats:', error);
         updateStatCard('total-users', 'Error');
@@ -81,8 +122,9 @@ async function loadOverallStats() {
  * Update a stat card value
  * @param {string} elementId - ID of the stat value element
  * @param {number|string} value - Value to display
+ * @param {number} previousValue - Previous value for week-on-week comparison
  */
-function updateStatCard(elementId, value) {
+function updateStatCard(elementId, value, previousValue = null) {
     const element = document.getElementById(elementId);
     if (element) {
         if (typeof value === 'number') {
@@ -91,21 +133,55 @@ function updateStatCard(elementId, value) {
             element.textContent = value;
         }
     }
+    
+    // Clear tooltip content - user doesn't want to see week-on-week differences in stat cards
+    const tooltipId = `tooltip-${elementId}`;
+    const tooltipElement = document.getElementById(tooltipId);
+    if (tooltipElement) {
+        tooltipElement.innerHTML = '';
+    }
 }
 
 /**
  * Load and display users chart
  * @param {string} period - 'daily' or 'weekly'
+ * @param {string} startDate - Optional start date filter (YYYY-MM-DD)
+ * @param {string} endDate - Optional end date filter (YYYY-MM-DD)
  */
-async function loadUsersChart(period = 'weekly') {
+async function loadUsersChart(period = 'weekly', startDate = null, endDate = null) {
     try {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:100',message:'loadUsersChart entry',data:{period},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:100',message:'loadUsersChart entry',data:{period,startDate,endDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
-        const data = await analyticsAPI.getNewUsersOverTime(period);
+        let data = await analyticsAPI.getNewUsersOverTime(period);
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:104',message:'Chart data received',data:{hasData:!!data,dataLength:data?.length||0,firstItem:data?.[0]?JSON.stringify(data[0]):null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
+        
+        // Apply date filter if provided
+        if (startDate || endDate) {
+            data = data.filter(item => {
+                if (!item.period_start) return false;
+                
+                const itemDate = new Date(item.period_start);
+                // Compare dates at midnight for accurate filtering
+                const itemDateOnly = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
+                
+                if (startDate) {
+                    const startDateObj = new Date(startDate + 'T00:00:00');
+                    const startDateOnly = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate());
+                    if (itemDateOnly < startDateOnly) return false;
+                }
+                
+                if (endDate) {
+                    const endDateObj = new Date(endDate + 'T23:59:59');
+                    const endDateOnly = new Date(endDateObj.getFullYear(), endDateObj.getMonth(), endDateObj.getDate());
+                    if (itemDateOnly > endDateOnly) return false;
+                }
+                
+                return true;
+            });
+        }
         
         if (!data || data.length === 0) {
             // #region agent log
@@ -115,7 +191,7 @@ async function loadUsersChart(period = 'weekly') {
             return;
         }
         
-        renderSimpleBarChart(data);
+        renderSimpleBarChart(data, period);
     } catch (error) {
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:115',message:'Chart load error',data:{errorMessage:error?.message,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
@@ -128,10 +204,11 @@ async function loadUsersChart(period = 'weekly') {
 /**
  * Render a simple bar chart using CSS/HTML
  * @param {Array} data - Array of {period_start, new_users_count}
+ * @param {string} period - 'daily' or 'weekly'
  */
-function renderSimpleBarChart(data) {
+function renderSimpleBarChart(data, period = 'weekly') {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:120',message:'renderSimpleBarChart entry',data:{dataLength:data?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7243/ingest/13978a60-52fa-47d2-b247-7e88c907794b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:120',message:'renderSimpleBarChart entry',data:{dataLength:data?.length||0,period},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
     const chartContainer = document.getElementById('users-chart');
     // #region agent log
@@ -157,6 +234,16 @@ function renderSimpleBarChart(data) {
     let barCount = 0;
     const containerHeight = 300; // Match CSS height
     displayData.forEach((item, index) => {
+        // Calculate difference - for weekly compare to previous week, for daily compare to previous day
+        const comparisonIndex = period === 'weekly' ? index - 1 : index - 1;
+        const previousValue = comparisonIndex >= 0 && comparisonIndex < displayData.length 
+            ? displayData[comparisonIndex].new_users_count 
+            : null;
+        const difference = previousValue !== null ? item.new_users_count - previousValue : null;
+        const percentageChange = previousValue !== null && previousValue !== 0
+            ? ((difference / previousValue) * 100).toFixed(1)
+            : null;
+        
         const barWrapper = document.createElement('div');
         barWrapper.className = 'chart-bar-wrapper';
         barWrapper.style.cssText = `
@@ -181,8 +268,27 @@ function renderSimpleBarChart(data) {
             margin-bottom: 4px;
             transition: all 0.3s;
             min-height: 2px;
+            position: relative;
         `;
-        bar.title = `${formatChartDate(item.period_start)}: ${item.new_users_count} users`;
+        
+        // Add number on top of bar
+        const barNumber = document.createElement('div');
+        barNumber.className = 'chart-bar-number';
+        barNumber.textContent = item.new_users_count;
+        bar.appendChild(barNumber);
+        
+        // Add hover tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'chart-bar-tooltip';
+        tooltip.innerHTML = `
+            <div class="tooltip-value">${formatChartDate(item.period_start)}: ${item.new_users_count} users</div>
+            ${difference !== null ? `
+                <div class="tooltip-change ${difference >= 0 ? 'positive' : 'negative'}">
+                    ${difference >= 0 ? '+' : ''}${difference} (${difference >= 0 ? '+' : ''}${percentageChange}%) vs previous ${period === 'weekly' ? 'week' : 'day'}
+                </div>
+            ` : ''}
+        `;
+        barWrapper.appendChild(tooltip);
         
         const label = document.createElement('div');
         label.className = 'chart-label';

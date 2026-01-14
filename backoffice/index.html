@@ -38,27 +38,40 @@
 
                 <!-- Statistics Grid -->
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Total Users</h3>
+                    <div class="stat-card" data-stat="total-users">
+                        <h3>Total Users <span class="tooltip-icon" data-tooltip="Total number of registered users in the system">ⓘ</span></h3>
                         <p class="stat-value" id="total-users">-</p>
+                        <div class="stat-tooltip" id="tooltip-total-users"></div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Active Users (30d)</h3>
+                    <div class="stat-card" data-stat="active-users">
+                        <h3>Active Users (30d) <span class="tooltip-icon" data-tooltip="Users who have updated their progress in the last 30 days">ⓘ</span></h3>
                         <p class="stat-value" id="active-users">-</p>
+                        <div class="stat-tooltip" id="tooltip-active-users"></div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Total Courses</h3>
+                    <div class="stat-card" data-stat="total-courses">
+                        <h3>Total Courses <span class="tooltip-icon" data-tooltip="Total number of published courses available">ⓘ</span></h3>
                         <p class="stat-value" id="total-courses">-</p>
+                        <div class="stat-tooltip" id="tooltip-total-courses"></div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Total Completions</h3>
+                    <div class="stat-card" data-stat="total-completions">
+                        <h3>Total Completions <span class="tooltip-icon" data-tooltip="Total number of course completions across all users">ⓘ</span></h3>
                         <p class="stat-value" id="total-completions">-</p>
+                        <div class="stat-tooltip" id="tooltip-total-completions"></div>
                     </div>
                 </div>
 
                 <!-- New Users Over Time Chart -->
                 <div class="chart-section">
-                    <h3>New Users Over Time</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                        <h3 style="margin: 0;">New Users Over Time</h3>
+                        <div class="date-filter">
+                            <input type="date" id="chart-start-date" class="date-input">
+                            <span style="margin: 0 0.5rem; color: var(--text-secondary);">to</span>
+                            <input type="date" id="chart-end-date" class="date-input">
+                            <button id="apply-date-filter" class="btn-secondary" style="margin-left: 0.5rem; padding: 0.5rem 1rem;">Apply</button>
+                            <button id="clear-date-filter" class="btn-secondary" style="margin-left: 0.25rem; padding: 0.5rem 1rem;">Clear</button>
+                        </div>
+                    </div>
                     <div class="chart-controls">
                         <button class="period-btn" data-period="daily">Daily</button>
                         <button class="period-btn active" data-period="weekly">Weekly</button>

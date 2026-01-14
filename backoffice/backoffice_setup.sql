@@ -126,21 +126,122 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
+  WITH course_lesson_counts AS (
+    -- Get total lessons per course
+    SELECT 
+      course_id,
+      COUNT(*)::BIGINT as total_lessons
+    FROM lessons
+    GROUP BY course_id
+  ),
+  user_course_completed_lessons AS (
+    -- Count completed lessons per user per course
+    SELECT 
+      up.course_id,
+      up.user_id,
+      COUNT(DISTINCT up.lesson_id) FILTER (WHERE up.completed_at IS NOT NULL)::BIGINT as completed_lessons
+    FROM user_progress up
+    GROUP BY up.course_id, up.user_id
+  ),
+  course_enrollments AS (
+    -- Count distinct users per course (enrollments)
+    SELECT 
+      course_id,
+      COUNT(DISTINCT user_id)::BIGINT as total_enrollments
+    FROM user_progress
+    GROUP BY course_id
+  ),
+  course_completions AS (
+    -- Count users who completed all lessons (completed_lessons = total_lessons)
+    SELECT 
+      ucc.course_id,
+      COUNT(DISTINCT ucc.user_id)::BIGINT as completed_count
+    FROM user_course_completed_lessons ucc
+    INNER JOIN course_lesson_counts clc ON clc.course_id = ucc.course_id
+    WHERE ucc.completed_lessons = clc.total_lessons AND clc.total_lessons > 0
+    GROUP BY ucc.course_id
+  )
   SELECT
     c.id as course_id,
     c.title::TEXT as course_title,
-    COUNT(DISTINCT up.user_id)::BIGINT as total_enrollments,
-    COUNT(DISTINCT CASE WHEN up.progress_percentage = 100 THEN up.user_id END)::BIGINT as completed_count,
+    COALESCE(ce.total_enrollments, 0)::BIGINT as total_enrollments,
+    COALESCE(cc.completed_count, 0)::BIGINT as completed_count,
     ROUND(
-      COUNT(DISTINCT CASE WHEN up.progress_percentage = 100 THEN up.user_id END)::NUMERIC /
-      NULLIF(COUNT(DISTINCT up.user_id), 0) * 100,
+      COALESCE(cc.completed_count, 0)::NUMERIC /
+      NULLIF(COALESCE(ce.total_enrollments, 0), 0) * 100,
       2
     ) as completion_rate
   FROM courses c
-  LEFT JOIN user_progress up ON up.course_id = c.id
+  LEFT JOIN course_enrollments ce ON ce.course_id = c.id
+  LEFT JOIN course_completions cc ON cc.course_id = c.id
   WHERE c.is_published = true
-  GROUP BY c.id, c.title
   ORDER BY completion_rate DESC NULLS LAST;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- STEP 3.5: Create User Search Function
+-- =====================================================
+-- Function to search users by email or name
+-- Searches both profiles.full_name and auth.users.email
+-- Returns profiles with matching name or email
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION search_users_by_email_or_name(search_term TEXT, result_limit INTEGER DEFAULT 50)
+RETURNS TABLE (
+  id UUID,
+  full_name TEXT,
+  email TEXT,
+  created_at TIMESTAMP,
+  role TEXT,
+  updated_at TIMESTAMP
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id,
+    p.full_name,
+    au.email::TEXT,
+    p.created_at,
+    p.role,
+    p.updated_at
+  FROM profiles p
+  JOIN auth.users au ON au.id = p.id
+  WHERE 
+    (p.full_name ILIKE '%' || search_term || '%' OR au.email ILIKE '%' || search_term || '%')
+    AND LENGTH(search_term) >= 2
+  ORDER BY p.created_at DESC
+  LIMIT result_limit;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- STEP 3.6: Create Get User Details Function
+-- =====================================================
+-- Function to get user details with email from auth.users
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_user_details_with_email(user_id UUID)
+RETURNS TABLE (
+  id UUID,
+  full_name TEXT,
+  email TEXT,
+  created_at TIMESTAMP,
+  role TEXT,
+  updated_at TIMESTAMP
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id,
+    p.full_name,
+    au.email::TEXT,
+    p.created_at,
+    p.role,
+    p.updated_at
+  FROM profiles p
+  JOIN auth.users au ON au.id = p.id
+  WHERE p.id = user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

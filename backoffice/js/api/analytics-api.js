@@ -39,9 +39,9 @@ class AnalyticsAPI {
             cutoffDate.setDate(cutoffDate.getDate() - days);
             
             // Get users who have updated progress in the last N days
-            const { count, error } = await this.supabase
+            const { data, error } = await this.supabase
                 .from('user_progress')
-                .select('user_id', { count: 'exact', head: false })
+                .select('user_id')
                 .gte('updated_at', cutoffDate.toISOString());
             
             if (error) {
@@ -56,8 +56,8 @@ class AnalyticsAPI {
             
             // Count distinct user_ids
             const uniqueUsers = new Set();
-            if (count && Array.isArray(count)) {
-                count.forEach(item => uniqueUsers.add(item.user_id));
+            if (data && Array.isArray(data)) {
+                data.forEach(item => uniqueUsers.add(item.user_id));
             }
             
             return uniqueUsers.size;
