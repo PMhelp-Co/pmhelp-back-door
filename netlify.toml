@@ -1,0 +1,8 @@
+# Root-level Netlify Configuration
+# This file tells Netlify to use the backoffice folder as the base directory
+# The actual netlify.toml with full config is in the backoffice/ folder
+
+[build]
+  base = "backoffice"
+  publish = "."
+  command = "echo 'No build needed - static files only'"

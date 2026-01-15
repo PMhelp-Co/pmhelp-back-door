@@ -1,0 +1,30 @@
+# Debug logs
+.cursor/debug.log
+.cursor/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (if any)
+.env
+.env.local
+
+# Node modules (if any are added later)
+node_modules/
+
+# Build files (if any are added later)
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*

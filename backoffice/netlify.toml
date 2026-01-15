@@ -1,0 +1,53 @@
+# Netlify Configuration for PMHelp Back-Office
+# This is a static site deployment configuration
+
+[build]
+  # No build step needed - we're using vanilla HTML/CSS/JS
+  # If your repo root IS the backoffice folder, leave base directory empty
+  # If your repo contains the backoffice folder, set: base = "backoffice"
+  publish = "."
+  command = "echo 'No build needed - static files only'"
+
+# Environment variables (set these in Netlify dashboard)
+# These are already in supabase-config.js but can be overridden here if needed
+[context.production.environment]
+  NODE_ENV = "production"
+
+[context.deploy-preview.environment]
+  NODE_ENV = "preview"
+
+# Redirect rules for SPA routing
+# The _redirects file handles the actual redirects, but we can also define here
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Cache static assets
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Don't cache HTML files
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"

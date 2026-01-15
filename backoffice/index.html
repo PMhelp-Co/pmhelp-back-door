@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMHelp Back-Office - Dashboard</title>
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/backoffice.css">
+</head>
+<body>
+    <div class="backoffice-container">
+        <!-- Header -->
+        <header class="backoffice-header">
+            <div class="header-content">
+                <h1>PMHelp Back-Office</h1>
+                <div class="header-actions">
+                    <span id="user-email" class="user-info"></span>
+                    <button id="logout-btn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tab-navigation">
+            <button class="tab-btn active" data-tab="analytics">Analytics</button>
+            <button class="tab-btn" data-tab="users">Users</button>
+            <button class="tab-btn" data-tab="marketing">Marketing</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Analytics Tab -->
+            <div class="tab-content active" id="analytics-tab">
+                <div class="tab-header">
+                    <h2>Analytics Dashboard</h2>
+                    <button id="refresh-analytics" class="btn-secondary">Refresh</button>
+                </div>
+
+                <!-- Statistics Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card" data-stat="total-users">
+                        <h3>Total Users <span class="tooltip-icon" data-tooltip="Total number of registered users in the system">ⓘ</span></h3>
+                        <p class="stat-value" id="total-users">-</p>
+                        <div class="hover-tooltip">Total number of registered users in the system</div>
+                    </div>
+                    <div class="stat-card" data-stat="active-users">
+                        <h3>Active Users (30d) <span class="tooltip-icon" data-tooltip="Users who have updated their progress in the last 30 days">ⓘ</span></h3>
+                        <p class="stat-value" id="active-users">-</p>
+                        <div class="hover-tooltip">Users who have updated their progress in the last 30 days</div>
+                    </div>
+                    <div class="stat-card" data-stat="total-courses">
+                        <h3>Total Courses <span class="tooltip-icon" data-tooltip="Total number of published courses available">ⓘ</span></h3>
+                        <p class="stat-value" id="total-courses">-</p>
+                        <div class="hover-tooltip">Total number of published courses available</div>
+                    </div>
+                    <div class="stat-card" data-stat="total-completions">
+                        <h3>Total Completions <span class="tooltip-icon" data-tooltip="Total number of course completions across all users">ⓘ</span></h3>
+                        <p class="stat-value" id="total-completions">-</p>
+                        <div class="hover-tooltip">Total number of course completions across all users</div>
+                    </div>
+                </div>
+
+                <!-- New Users Over Time Chart -->
+                <div class="chart-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                        <h3 style="margin: 0;">New Users Over Time</h3>
+                        <div class="date-filter">
+                            <input type="date" id="chart-start-date" class="date-input">
+                            <span style="margin: 0 0.5rem; color: var(--text-secondary);">to</span>
+                            <input type="date" id="chart-end-date" class="date-input">
+                            <button id="apply-date-filter" class="btn-secondary" style="margin-left: 0.5rem; padding: 0.5rem 1rem;">Apply</button>
+                            <button id="clear-date-filter" class="btn-secondary" style="margin-left: 0.25rem; padding: 0.5rem 1rem;">Clear</button>
+                        </div>
+                    </div>
+                    <div class="chart-controls">
+                        <button class="period-btn" data-period="daily">Daily</button>
+                        <button class="period-btn active" data-period="weekly">Weekly</button>
+                    </div>
+                    <div id="users-chart-container" class="chart-container">
+                        <div id="users-chart" class="simple-chart"></div>
+                    </div>
+                </div>
+
+                <!-- Course Completion Rates -->
+                <div class="completion-rates">
+                    <h3>Course Completion Rates</h3>
+                    <div class="table-container">
+                        <table id="completion-table">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Enrollments</th>
+                                    <th>Completions</th>
+                                    <th>Completion Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="completion-tbody">
+                                <tr>
+                                    <td colspan="4" class="loading">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Placeholder for Certificate Generation -->
+                <div class="placeholder-section">
+                    <h3>Certificate Generation</h3>
+                    <p class="placeholder-text">This section will track certificate generation statistics once implemented.</p>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div class="tab-content" id="users-tab">
+                <div class="tab-header">
+                    <h2>User Management</h2>
+                </div>
+
+                <!-- Search Section -->
+                <div class="search-section">
+                    <input 
+                        type="text" 
+                        id="user-search-input" 
+                        placeholder="Search by email or name..."
+                        class="search-input"
+                        autocomplete="off"
+                    />
+                    <button id="search-btn" class="btn-primary">Search</button>
+                </div>
+
+                <!-- Search Results -->
+                <div id="search-results" class="search-results"></div>
+
+                <!-- User Details -->
+                <div id="user-details" class="user-details" style="display: none;">
+                    <h2>User Details</h2>
+                    <div class="user-info-grid">
+                        <div class="info-item">
+                            <label>Name:</label>
+                            <span id="detail-name">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Email:</label>
+                            <span id="detail-email">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Signup Date:</label>
+                            <span id="detail-signup">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Last Login:</label>
+                            <span id="detail-last-login">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Overall Progress:</label>
+                            <span id="detail-overall-progress">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Role:</label>
+                            <span id="detail-role">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Enrolled Courses -->
+                    <div class="enrolled-courses">
+                        <h3>Enrolled Courses</h3>
+                        <div class="table-container">
+                            <table id="courses-table">
+                                <thead>
+                                    <tr>
+                                        <th>Course</th>
+                                        <th>Progress</th>
+                                        <th>Last Activity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="courses-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <button class="btn-warning" id="flag-inactive-btn">Flag as Inactive</button>
+                        <button class="btn-primary" id="send-email-btn">Send Follow-up Email</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Marketing Tab -->
+            <div class="tab-content" id="marketing-tab">
+                <div class="tab-header">
+                    <h2>Website Banner Management</h2>
+                    <p class="subtitle">Update website banners without developer intervention</p>
+                </div>
+
+                <div class="banners-list">
+                    <div class="banner-item" data-banner-key="homepage-announcement">
+                        <div class="banner-header">
+                            <h3>Homepage Announcement Banner</h3>
+                            <span class="badge-status" id="status-badge">-</span>
+                        </div>
+
+                        <form id="banner-form">
+                            <input type="hidden" id="banner-id" />
+                            <input type="hidden" id="banner-key" value="homepage-announcement" />
+
+                            <div class="form-group">
+                                <label for="badge-text">Badge Text (e.g., "NEW", "FEATURED"):</label>
+                                <input type="text" id="badge-text" placeholder="NEW" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="banner-text">Banner Text:</label>
+                                <textarea id="banner-text" rows="3" required placeholder="Enter banner message..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="link-url">Link URL:</label>
+                                <input type="url" id="link-url" placeholder="https://pmhelp.co/reports" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="link-text">Link Text (optional):</label>
+                                <input type="text" id="link-text" placeholder="Learn more" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="is-active" checked />
+                                    <span>Active Status</span>
+                                </label>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="start-date">Start Date (optional):</label>
+                                    <input type="datetime-local" id="start-date" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="end-date">End Date (optional):</label>
+                                    <input type="datetime-local" id="end-date" />
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Banner</button>
+                                <button type="button" class="btn-secondary" id="preview-btn">Preview</button>
+                                <button type="button" class="btn-danger" id="delete-btn">Delete</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Preview Section -->
+                <div class="preview-section" id="preview-section" style="display: none;">
+                    <h3>Preview</h3>
+                    <div id="banner-preview" class="banner-preview"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Loading...</p>
+        </div>
+
+        <!-- Message Toast -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+    
+    <!-- Backoffice Scripts -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api/analytics-api.js"></script>
+    <script src="js/api/users-api.js"></script>
+    <script src="js/api/banners-api.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/marketing.js"></script>
+
+    <!-- Main App Initialization -->
+    <script>
+        // Initialize app after DOM loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication first
+            const auth = new BackofficeAuth();
+            const session = await auth.requireAuth();
+            
+            if (!session) {
+                return; // Redirected to login
+            }
+
+            // Show user email
+            const userEmail = session.user.email;
+            document.getElementById('user-email').textContent = userEmail;
+
+            // Initialize tab navigation
+            initTabNavigation();
+
+            // Initialize logout button
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await auth.logout();
+            });
+
+            // Load initial tab content
+            loadActiveTab();
+        });
+
+        function initTabNavigation() {
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetTab = btn.dataset.tab;
+
+                    // Update active states
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `${targetTab}-tab`) {
+                            content.classList.add('active');
+                        }
+                    });
+
+                    // Load tab content
+                    loadActiveTab();
+                });
+            });
+        }
+
+        function loadActiveTab() {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (!activeTab) return;
+
+            const tabId = activeTab.id;
+
+            if (tabId === 'analytics-tab') {
+                // Analytics will auto-load
+                if (typeof loadAnalytics === 'function') {
+                    loadAnalytics();
+                }
+            } else if (tabId === 'users-tab') {
+                // Users tab - search will be handled by users.js
+            } else if (tabId === 'marketing-tab') {
+                // Marketing tab - load banner if exists
+                if (typeof loadBannerForm === 'function') {
+                    loadBannerForm();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
