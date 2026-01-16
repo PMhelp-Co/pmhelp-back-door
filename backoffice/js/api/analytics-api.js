@@ -216,14 +216,27 @@ class AnalyticsAPI {
      */
     async getCourseCompletionRates() {
         try {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:217',message:'getCourseCompletionRates entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
             // Try to use the SQL function first
             const { data: functionData, error: functionError } = await this.supabase
                 .rpc('get_course_completion_rates');
             
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:221',message:'SQL function call result',data:{hasFunctionData:!!functionData,functionDataLength:functionData?.length||0,hasError:!!functionError,errorCode:functionError?.code,errorMessage:functionError?.message,usingSQLFunction:!functionError&&!!functionData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            
             if (!functionError && functionData) {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:224',message:'SQL function data sample',data:{sampleCourses:functionData.slice(0,3).map(c=>({course_title:c.course_title,total_enrollments:c.total_enrollments,completed_count:c.completed_count,completion_rate:c.completion_rate}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 return functionData;
             }
             
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:227',message:'Using fallback JavaScript calculation',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             // Fallback: Query manually if function doesn't exist
             const { data: courses, error: coursesError } = await this.supabase
                 .from('courses')
@@ -234,6 +247,10 @@ class AnalyticsAPI {
                 console.error('Error fetching courses:', coursesError);
                 return [];
             }
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:236',message:'Courses fetched for fallback',data:{coursesCount:courses.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             
             const completionRates = [];
             
@@ -248,17 +265,32 @@ class AnalyticsAPI {
                     continue;
                 }
                 
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:246',message:'Progress data fetched',data:{courseId:course.id,courseTitle:course.title,progressRecordsCount:progress?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                // #endregion
+                
                 const totalEnrollments = new Set(progress.map(p => p.user_id)).size;
-                const completedCount = progress.filter(p => p.progress_percentage === 100).length;
+                const completedRecords = progress.filter(p => p.progress_percentage === 100);
+                const uniqueCompletedUsers = new Set(completedRecords.map(p => p.user_id)).size;
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:254',message:'Before calculation',data:{courseTitle:course.title,totalEnrollments,completedRecordsCount:completedRecords.length,uniqueCompletedUsers,duplicateCompletions:completedRecords.length!==uniqueCompletedUsers},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
+                // #endregion
+                
+                // Use uniqueCompletedUsers instead of total completion records to avoid double-counting
                 const completionRate = totalEnrollments > 0 
-                    ? ((completedCount / totalEnrollments) * 100).toFixed(2) 
+                    ? ((uniqueCompletedUsers / totalEnrollments) * 100).toFixed(2) 
                     : 0;
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:262',message:'After calculation',data:{courseTitle:course.title,totalEnrollments,completedCount:uniqueCompletedUsers,completionRate:parseFloat(completionRate)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
+                // #endregion
                 
                 completionRates.push({
                     course_id: course.id,
                     course_title: course.title,
                     total_enrollments: totalEnrollments,
-                    completed_count: completedCount,
+                    completed_count: uniqueCompletedUsers,
                     completion_rate: parseFloat(completionRate)
                 });
             }
@@ -266,6 +298,9 @@ class AnalyticsAPI {
             // Sort by completion rate descending
             return completionRates.sort((a, b) => b.completion_rate - a.completion_rate);
         } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics-api.js:277',message:'getCourseCompletionRates error',data:{errorMessage:error?.message,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
             console.error('Error in getCourseCompletionRates:', error);
             return [];
         }

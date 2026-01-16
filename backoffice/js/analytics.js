@@ -348,7 +348,13 @@ function displayChartError() {
  */
 async function loadCompletionRates() {
     try {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:349',message:'loadCompletionRates entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         const completionData = await analyticsAPI.getCourseCompletionRates();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:352',message:'Completion data received',data:{dataLength:completionData?.length||0,allCourses:completionData?.map(c=>({title:c.course_title,enrollments:c.total_enrollments,completions:c.completed_count,rate:c.completion_rate}))||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         const tbody = document.getElementById('completion-tbody');
         
         if (!tbody) return;
@@ -361,6 +367,12 @@ async function loadCompletionRates() {
         tbody.innerHTML = completionData.map(course => {
             const completionRate = course.completion_rate || 0;
             const rateDisplay = isNaN(completionRate) ? '0.00' : completionRate.toFixed(2);
+            
+            // #region agent log
+            if (completionRate > 100) {
+                fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:365',message:'Found completion rate >100%',data:{courseTitle:course.course_title,enrollments:course.total_enrollments,completions:course.completed_count,rate:completionRate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            }
+            // #endregion
             
             return `
                 <tr>
@@ -379,6 +391,9 @@ async function loadCompletionRates() {
             `;
         }).join('');
     } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ce2938ad-f898-40c9-98e9-4551009b4f6d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'analytics.js:382',message:'loadCompletionRates error',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         console.error('Error loading completion rates:', error);
         const tbody = document.getElementById('completion-tbody');
         if (tbody) {

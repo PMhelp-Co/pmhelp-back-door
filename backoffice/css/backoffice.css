@@ -234,6 +234,7 @@ h3 {
   transition: all var(--transition-base);
   cursor: default;
   position: relative;
+  overflow: visible;
 }
 
 .stat-card:hover {
@@ -290,6 +291,44 @@ h3 {
 
 .stat-tooltip .tooltip-change.negative {
   color: var(--danger-color);
+}
+
+/* Hover Tooltip for Analytics Cards */
+.hover-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--gray-900);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.75rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base), transform var(--transition-base);
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 4px;
+  max-width: 250px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.stat-card:hover .hover-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-12px);
+}
+
+.hover-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--gray-900);
 }
 
 .stat-value {
