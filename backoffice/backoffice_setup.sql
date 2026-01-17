@@ -246,6 +246,62 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =====================================================
+-- STEP 3.7: Create Get All Users With Email Function
+-- =====================================================
+-- Function to get all users with emails in a single query
+-- Optimized for performance - single query instead of N queries
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_all_users_with_email(result_limit INTEGER DEFAULT 1000, sort_field TEXT DEFAULT 'created_at', sort_ascending BOOLEAN DEFAULT false)
+RETURNS TABLE (
+  id UUID,
+  full_name TEXT,
+  email TEXT,
+  created_at TIMESTAMP,
+  role TEXT,
+  updated_at TIMESTAMP
+) AS $$
+DECLARE
+  order_clause TEXT;
+BEGIN
+  -- Build ORDER BY clause based on sort_field and sort_ascending
+  -- Default to created_at DESC if invalid sort_field
+  IF sort_field = 'full_name' THEN
+    IF sort_ascending THEN
+      order_clause := 'ORDER BY LOWER(p.full_name) ASC';
+    ELSE
+      order_clause := 'ORDER BY LOWER(p.full_name) DESC';
+    END IF;
+  ELSE
+    -- Default to created_at
+    IF sort_ascending THEN
+      order_clause := 'ORDER BY p.created_at ASC';
+    ELSE
+      order_clause := 'ORDER BY p.created_at DESC';
+    END IF;
+  END IF;
+  
+  -- Use EXECUTE for dynamic SQL
+  RETURN QUERY
+  EXECUTE format('
+    SELECT 
+      p.id,
+      p.full_name,
+      au.email::TEXT,
+      p.created_at,
+      p.role,
+      p.updated_at
+    FROM profiles p
+    JOIN auth.users au ON au.id = p.id
+    %s
+    LIMIT %s',
+    order_clause,
+    result_limit
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
 -- STEP 4: Add/Update RLS Policies for Admin Access
 -- =====================================================
 -- Ensure admins/team/instructors can view all profiles

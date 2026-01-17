@@ -1,12 +1,26 @@
 // Users Management Logic
-// Handles UI interactions for user search and details
+// Handles UI interactions for user search, filtering, and details
 
 let usersAPI;
 let currentUserId = null;
+let allUsers = [];
+let filteredUsers = [];
 
 // Initialize users module when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     usersAPI = new UsersAPI();
+    
+    // Filter handlers
+    const filterRole = document.getElementById('filter-role');
+    const filterSort = document.getElementById('filter-sort');
+    
+    if (filterRole) {
+        filterRole.addEventListener('change', applyFilters);
+    }
+    
+    if (filterSort) {
+        filterSort.addEventListener('change', applyFilters);
+    }
     
     // Search input handlers
     const searchInput = document.getElementById('user-search-input');
@@ -39,11 +53,173 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Perform user search
+ * Load all users and display as cards
+ */
+async function loadAllUsers() {
+    const cardsContainer = document.getElementById('user-cards-container');
+    const searchResults = document.getElementById('search-results');
+    
+    if (!cardsContainer) return;
+    
+    // Show cards container, hide search results
+    cardsContainer.style.display = 'grid';
+    if (searchResults) {
+        searchResults.style.display = 'none';
+    }
+    
+    showLoading(true);
+    cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem;">Loading users...</div>';
+    
+    try {
+        allUsers = await usersAPI.getAllUsers(1000);
+        filteredUsers = [...allUsers];
+        
+        if (allUsers.length === 0) {
+            cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-secondary);">No users found</div>';
+            return;
+        }
+        
+        applyFilters(); // This will display the cards
+    } catch (error) {
+        console.error('Error loading users:', error);
+        cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--danger-color);">Error loading users. Please try again.</div>';
+        showToast('Error loading users', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+/**
+ * Apply filters to user cards
+ */
+function applyFilters() {
+    const filterRole = document.getElementById('filter-role');
+    const filterSort = document.getElementById('filter-sort');
+    const cardsContainer = document.getElementById('user-cards-container');
+    
+    if (!cardsContainer) return;
+    
+    // Start with all users
+    filteredUsers = [...allUsers];
+    
+    // Filter by role
+    if (filterRole && filterRole.value) {
+        filteredUsers = filteredUsers.filter(user => user.role === filterRole.value);
+    }
+    
+    // Sort
+    if (filterSort && filterSort.value) {
+        const [sortField, sortOrder] = filterSort.value.split('-');
+        const ascending = sortOrder === 'asc';
+        
+        filteredUsers.sort((a, b) => {
+            let aVal = a[sortField] || '';
+            let bVal = b[sortField] || '';
+            
+            if (sortField === 'created_at') {
+                aVal = new Date(aVal);
+                bVal = new Date(bVal);
+            } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+            }
+            
+            if (ascending) {
+                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+            } else {
+                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+            }
+        });
+    }
+    
+    // Display filtered cards
+    displayUserCards(filteredUsers);
+}
+
+/**
+ * Display user cards in grid
+ * @param {Array} users - Array of user objects
+ */
+function displayUserCards(users) {
+    const cardsContainer = document.getElementById('user-cards-container');
+    if (!cardsContainer) return;
+    
+    if (!users || users.length === 0) {
+        cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-secondary);">No users found</div>';
+        return;
+    }
+    
+    cardsContainer.innerHTML = users.map(user => {
+        const roleBadge = getRoleBadge(user.role);
+        const initials = getUserInitials(user.full_name || user.email || 'U');
+        
+        return `
+            <div class="user-card" data-user-id="${user.id}">
+                <div class="user-card-avatar">${initials}</div>
+                <div class="user-card-content">
+                    <div class="user-card-name">
+                        ${escapeHtml(user.full_name || 'No name')} ${roleBadge}
+                    </div>
+                    <div class="user-card-email">${escapeHtml(user.email || 'No email')}</div>
+                    <div class="user-card-meta">
+                        <span class="user-card-date">Joined ${usersAPI.formatDate(user.created_at)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Add click handlers to cards
+    cardsContainer.querySelectorAll('.user-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const userId = card.dataset.userId;
+            loadUserDetails(userId);
+        });
+    });
+}
+
+/**
+ * Get role badge HTML
+ * @param {string} role - User role
+ * @returns {string} Badge HTML
+ */
+function getRoleBadge(role) {
+    const roleConfig = {
+        'admin': { text: 'ADMIN', color: 'var(--danger-color)' },
+        'team': { text: 'TEAM', color: 'var(--primary-color)' },
+        'instructor': { text: 'INSTRUCTOR', color: 'var(--pmhelp-purple-accent)' },
+        'student': { text: 'STUDENT', color: 'var(--text-secondary)' }
+    };
+    
+    const config = roleConfig[role] || { text: role?.toUpperCase() || '', color: 'var(--text-muted)' };
+    
+    return config.text ? `<span class="user-role-badge" style="background: ${config.color};">${config.text}</span>` : '';
+}
+
+/**
+ * Get user initials
+ * @param {string} name - User name or email
+ * @returns {string} Initials (max 2 characters)
+ */
+function getUserInitials(name) {
+    if (!name) return 'U';
+    
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase().substring(0, 2);
+    }
+    
+    return name.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Perform user search - clears cards and shows search results
  */
 async function performSearch() {
     const searchInput = document.getElementById('user-search-input');
     const searchResults = document.getElementById('search-results');
+    const cardsContainer = document.getElementById('user-cards-container');
+    const filtersSection = document.getElementById('user-filters-section');
     
     if (!searchInput || !searchResults) return;
     
@@ -53,6 +229,15 @@ async function performSearch() {
         showToast('Please enter at least 2 characters to search', 'warning');
         return;
     }
+    
+    // Hide cards and filters, show search results
+    if (cardsContainer) {
+        cardsContainer.style.display = 'none';
+    }
+    if (filtersSection) {
+        filtersSection.style.display = 'none';
+    }
+    searchResults.style.display = 'block';
     
     showLoading(true);
     searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">Searching...</div>';
@@ -83,6 +268,29 @@ async function performSearch() {
 }
 
 /**
+ * Clear search and return to card view
+ */
+function clearSearch() {
+    const searchInput = document.getElementById('user-search-input');
+    const searchResults = document.getElementById('search-results');
+    const cardsContainer = document.getElementById('user-cards-container');
+    const filtersSection = document.getElementById('user-filters-section');
+    
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    if (searchResults) {
+        searchResults.style.display = 'none';
+    }
+    if (cardsContainer) {
+        cardsContainer.style.display = 'grid';
+    }
+    if (filtersSection) {
+        filtersSection.style.display = 'block';
+    }
+}
+
+/**
  * Display search results
  * @param {Array} users - Array of user objects
  */
@@ -91,10 +299,10 @@ function displaySearchResults(users) {
     if (!searchResults) return;
     
     searchResults.innerHTML = users.map(user => {
-        const roleBadge = user.role === 'admin' ? '<span style="background: var(--danger-color); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">ADMIN</span>' : '';
+        const roleBadge = getRoleBadge(user.role);
         
         return `
-            <div class="result-item" data-user-id="${user.id}" style="padding: 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s;">
+            <div class="result-item" data-user-id="${user.id}">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <div style="font-weight: 500; margin-bottom: 4px;">

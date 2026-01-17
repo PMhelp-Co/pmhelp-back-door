@@ -7,6 +7,48 @@ class UsersAPI {
     }
 
     /**
+     * Get all users with email addresses
+     * Optimized: Uses a single SQL function call instead of N individual calls
+     * @param {number} limit - Maximum results (default: 1000)
+     * @param {string} sortBy - Sort by field (default: 'created_at')
+     * @param {boolean} ascending - Sort ascending (default: false)
+     * @returns {Promise<Array>} Array of user profiles with emails
+     */
+    async getAllUsers(limit = 1000, sortBy = 'created_at', ascending = false) {
+        try {
+            // Use optimized RPC function that gets all users with emails in a single query
+            const { data, error } = await this.supabase
+                .rpc('get_all_users_with_email', {
+                    result_limit: limit,
+                    sort_field: sortBy,
+                    sort_ascending: ascending
+                });
+            
+            if (error) {
+                console.error('Error fetching all users:', error);
+                // Fallback: try getting profiles without emails (faster than individual calls)
+                const { data: profiles, error: profilesError } = await this.supabase
+                    .from('profiles')
+                    .select('id, full_name, role, created_at, updated_at')
+                    .order(sortBy, { ascending })
+                    .limit(limit);
+                
+                if (profilesError) {
+                    return [];
+                }
+                
+                // Return profiles without emails as fallback
+                return (profiles || []).map(p => ({ ...p, email: null }));
+            }
+            
+            return data || [];
+        } catch (error) {
+            console.error('Error in getAllUsers:', error);
+            return [];
+        }
+    }
+
+    /**
      * Search users by email or name
      * @param {string} searchTerm - Search term (email or name)
      * @param {number} limit - Maximum results (default: 50)
